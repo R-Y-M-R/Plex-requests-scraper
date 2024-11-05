@@ -11,32 +11,46 @@ PLEX_TOKEN = "your_plex_token"  # Replace with your myPlexToken value
 url = f"http://{PLEX_IP}:{PLEX_PORT}/status/sessions/history/all?X-Plex-Token={PLEX_TOKEN}"
 
 def get_watch_history():
+    print(f"Attempting to connect to Plex at: {url}")
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Check if request was successful
+        response.raise_for_status()  # Raise error for bad responses
+        
+        # Log the raw XML response content
+        print("Raw XML Response:")
+        print(response.text)  # Show the entire XML response
+        
+        print("Parsing XML data...")
 
-        # Parse the XML response
+        # Parse XML response
         root = ET.fromstring(response.content)
         
-        # Extract watched items and store details in a list
         history = []
-        for media in root.findall("MediaContainer/Video"):
+        for media in root.findall("Video"):  # Adjusted to match XML structure
             title = media.get("title")
-            view_count = media.get("viewCount")
-            last_viewed_at = media.get("lastViewedAt")
+            viewed_at = media.get("viewedAt")
+            library_section_id = media.get("librarySectionID")
+            parent_title = media.get("parentTitle")
+            grandparent_title = media.get("grandparentTitle")
             
-            # Add each watched item to the history list as a dictionary
             history.append({
                 "title": title,
-                "view_count": int(view_count) if view_count else 0,
-                "last_viewed_at": last_viewed_at  # Optional: Convert to a readable date format
+                "viewed_at": viewed_at,
+                "library_section_id": library_section_id,
+                "parent_title": parent_title,
+                "grandparent_title": grandparent_title
             })
         
         return history
     
-    except requests.exceptions.RequestException as e:
-        print(f"Error: {e}")
-        return []
+    except requests.exceptions.HTTPError as http_err:
+        print(f"HTTP error occurred: {http_err}")
+    except requests.exceptions.RequestException as req_err:
+        print(f"Request error occurred: {req_err}")
+    except ET.ParseError as parse_err:
+        print(f"XML parse error: {parse_err}")
+
+    return []
 
 def save_history_to_json(history, filename="plex_watch_history.json"):
     try:
